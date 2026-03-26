@@ -41,8 +41,7 @@ A C# / .NET tool for fetching 10+ years of financial data from official regulato
 
 ```bash
 # Navigate to project directory
-cd c:\Projects\Test\StockDataFetcher
-
+cd src
 # Restore NuGet packages
 dotnet restore
 ```
@@ -79,7 +78,7 @@ dotnet run -- AAPL --verbose
 ### Command-Line Arguments
 
 ```
-Usage: StockSelector <TICKER> [TICKER...] [options]
+Usage: StockSelectorCS <TICKER> [TICKER...] [options]
 
 positional arguments:
   tickers               Stock ticker symbols (e.g., AAPL MSFT ASML.NL)
@@ -117,7 +116,7 @@ GOOGL,,2015,USD,74989000000,,19360000000,16348000000,26024000000
 
 ### File Location
 
-Output files are saved in: `c:\Projects\Test\StockDataFetcher\data\`
+Output files are saved in: `\src\data`
 
 **Naming Convention:**
 - Single company: `financial_data_{TICKER}_{YYYYMMDD}.csv`
@@ -155,31 +154,32 @@ For companies with limited data:
 ## Project Structure
 
 ```
-StockDataFetcher/
-├── Program.cs                     # CLI entry point
-├── Config.cs                      # XBRL concepts & configuration
-├── SecEdgarFetcher.cs             # SEC API integration ✅ WORKING
-├── EsefFetcher.cs                 # ESEF API integration ✅ WORKING
-├── CsvExporter.cs                 # CSV generation
-├── SimpleCache.cs                 # File-based cache (24-hour expiry)
-├── TickerUtils.cs                 # Ticker normalisation & country detection
-├── Logger.cs                      # Console logger
-├── StockSelector.csproj           # .NET 10 project file
-├── data/
-│   ├── sec_ticker_cik_mapping.csv # Ticker→CIK lookup table
-│   ├── esef_ticker_lei_mapping.csv# Ticker→LEI lookup table (optional overrides)
-│   └── financial_data_*.csv       # Output files
-├── cache/
-│   └── us/{CIK}/company_facts.json# Cached SEC API responses
-│   └── eu/{LEI}/facts_*.json      # Cached ESEF filing responses
-└── README.md                      # This file
+FinancialDataAggregator/
+├── README.md
+└── src/
+  ├── Program.cs                     # CLI entry point
+  ├── Config.cs                      # XBRL concepts & configuration
+  ├── SecEdgarFetcher.cs             # SEC API integration
+  ├── EsefFetcher.cs                 # ESEF API integration
+  ├── CsvExporter.cs                 # CSV generation
+  ├── SimpleCache.cs                 # File-based cache (24-hour expiry)
+  ├── TickerUtils.cs                 # Ticker normalization & country detection
+  ├── Logger.cs                      # Console logger
+  ├── StockDataFetcher.csproj        # .NET 10 project file
+  ├── data/
+  │   ├── sec_ticker_cik_mapping.csv # Ticker->CIK lookup table
+  │   ├── esef_ticker_lei_mapping.csv# Ticker->LEI lookup table (optional overrides)
+  │   └── financial_data_*.csv       # Output files
+  └── cache/
+    ├── us/{CIK}/company_facts.json# Cached SEC API responses
+    └── eu/{LEI}/facts_*.json      # Cached ESEF filing responses
 ```
 
 ## Configuration
 
 ### Adding More Stock Tickers
 
-Edit `data/sec_ticker_cik_mapping.csv` to add more US stocks:
+Edit `src/data/sec_ticker_cik_mapping.csv` to add more US stocks:
 
 ```csv
 ticker,cik
@@ -193,7 +193,7 @@ Get CIK from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany
 
 ### EU Ticker Disambiguation (Optional)
 
-Some EU tickers are ambiguous across exchanges/companies. You can force a specific LEI mapping by creating/updating `data/esef_ticker_lei_mapping.csv`:
+Some EU tickers are ambiguous across exchanges/companies. You can force a specific LEI mapping by creating/updating `src/data/esef_ticker_lei_mapping.csv`:
 
 ```csv
 ticker,lei
@@ -213,13 +213,13 @@ public const int MinYearsRequired = 5;  // Default is 5 years (change as needed)
 ## Troubleshooting
 
 ### Issue: "Could not find CIK for ticker"
-**Solution**: Add ticker to `data/sec_ticker_cik_mapping.csv` with its CIK number
+**Solution**: Add ticker to `src/data/sec_ticker_cik_mapping.csv` with its CIK number
 
 ### Issue: "No data retrieved" or only 1 year extracted
 **Solution**: This is normal for some companies - SEC EDGAR has sparse historical XBRL data. The tool still exports what's available.
 
 ### Issue: EU ticker resolves to wrong company
-**Solution**: Add an explicit mapping in `data/esef_ticker_lei_mapping.csv` (Ticker,LEI). This is recommended for short/ambiguous tickers.
+**Solution**: Add an explicit mapping in `src/data/esef_ticker_lei_mapping.csv` (Ticker,LEI). This is recommended for short/ambiguous tickers.
 
 ### Issue: API 403 errors
 **Solution**: Make sure the `User-Agent` header in `SecEdgarFetcher.cs` includes contact info. Check SEC rate limits (typically 10 requests/second allowed).
