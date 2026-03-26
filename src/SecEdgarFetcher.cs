@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace StockSelector;
+namespace StockDataFetcher;
 
 /// <summary>One year of financial data for a company.</summary>
 public class FinancialRecord

@@ -1,4 +1,4 @@
-namespace StockSelector;
+namespace StockDataFetcher;
 
 public static class TickerUtils
 {

@@ -1,4 +1,4 @@
-namespace StockSelector;
+namespace StockDataFetcher;
 
 /// <summary>Thin console logger matching Python logging format.</summary>
 public static class Logger

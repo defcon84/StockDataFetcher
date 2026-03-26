@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace StockSelector;
+namespace StockDataFetcher;
 
 /// <summary>File-based JSON cache with 24-hour expiry.</summary>
 public class SimpleCache

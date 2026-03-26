@@ -1,4 +1,4 @@
-﻿using StockSelector;
+﻿using StockDataFetcher;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Simple CLI argument parsing

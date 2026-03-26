@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace StockSelector;
+namespace StockDataFetcher;
 
 /// <summary>Metadata for one ESEF filing retrieved from filings.xbrl.org.</summary>
 public record FilingInfo(string JsonUrl, string PeriodEnd, string FxoId, string Processed);
