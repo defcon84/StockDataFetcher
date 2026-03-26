@@ -2,26 +2,30 @@
 
 A C# / .NET tool for fetching 10+ years of financial data from official regulatory filings worldwide and exporting to CSV format.
 
-**Status**: ✅ **OPERATIONAL** - SEC EDGAR (US companies) fully functional
+**Status**: ✅ **OPERATIONAL** - SEC EDGAR (US) + ESEF (EU) functional
 
 ## Features
 
 ### ✅ Currently Working
 - **SEC EDGAR API Integration** - Fetch official 10-K filings for US companies
+- **ESEF API Integration** - Fetch official iXBRL filings for EU companies via filings.xbrl.org
 - **Automatic CIK Lookup** - Map stock tickers to SEC identifiers
+- **Automatic LEI Lookup** - Map EU tickers to legal entity identifiers (LEI)
 - **XBRL Financial Metrics** - Extract standardized financial data:
   - Revenue
   - Gross Profit
   - Operating Profit
   - Net Profit
   - Cash from Operations
+  - PPE
+  - Diluted Shares Outstanding
 - **CSV Export** - Single or multi-company output files
 - **Batch Processing** - Process multiple stocks at once
 - **Retry Logic** - Automatic retry with exponential backoff
 - **Rate Limiting** - Respectful SEC API access
+- **File Cache** - 24-hour cache for API responses (US + EU)
 
 ### 🔄 Planned (v2)
-- EU ESEF (iXBRL) for European companies
 - SEDAR+ for Canadian companies
 - ASX data for Australian companies
 - EDINET for Japanese companies
@@ -37,7 +41,7 @@ A C# / .NET tool for fetching 10+ years of financial data from official regulato
 
 ```bash
 # Navigate to project directory
-cd c:\Projects\Test\StockSelectorCS
+cd c:\Projects\Test\StockDataFetcher
 
 # Restore NuGet packages
 dotnet restore
@@ -57,6 +61,11 @@ dotnet run -- AAPL
 dotnet run -- AAPL MSFT NVDA GOOGL
 ```
 
+**Fetch EU stocks (ESEF):**
+```bash
+dotnet run -- ASML.NL MC.FR
+```
+
 **Merge multiple stocks into one CSV:**
 ```bash
 dotnet run -- AAPL MSFT NVDA --merge
@@ -70,7 +79,7 @@ dotnet run -- AAPL --verbose
 ### Command-Line Arguments
 
 ```
-Usage: StockSelectorCS <TICKER> [TICKER...] [options]
+Usage: StockSelector <TICKER> [TICKER...] [options]
 
 positional arguments:
   tickers               Stock ticker symbols (e.g., AAPL MSFT ASML.NL)
@@ -108,7 +117,7 @@ GOOGL,,2015,USD,74989000000,,19360000000,16348000000,26024000000
 
 ### File Location
 
-Output files are saved in: `c:\Projects\Test\StockSelectorCS\data\`
+Output files are saved in: `c:\Projects\Test\StockDataFetcher\data\`
 
 **Naming Convention:**
 - Single company: `financial_data_{TICKER}_{YYYYMMDD}.csv`
@@ -146,20 +155,23 @@ For companies with limited data:
 ## Project Structure
 
 ```
-StockSelectorCS/
+StockDataFetcher/
 ├── Program.cs                     # CLI entry point
 ├── Config.cs                      # XBRL concepts & configuration
 ├── SecEdgarFetcher.cs             # SEC API integration ✅ WORKING
+├── EsefFetcher.cs                 # ESEF API integration ✅ WORKING
 ├── CsvExporter.cs                 # CSV generation
 ├── SimpleCache.cs                 # File-based cache (24-hour expiry)
 ├── TickerUtils.cs                 # Ticker normalisation & country detection
 ├── Logger.cs                      # Console logger
-├── StockSelectorCS.csproj         # .NET 10 project file
+├── StockSelector.csproj           # .NET 10 project file
 ├── data/
 │   ├── sec_ticker_cik_mapping.csv # Ticker→CIK lookup table
+│   ├── esef_ticker_lei_mapping.csv# Ticker→LEI lookup table (optional overrides)
 │   └── financial_data_*.csv       # Output files
 ├── cache/
 │   └── us/{CIK}/company_facts.json# Cached SEC API responses
+│   └── eu/{LEI}/facts_*.json      # Cached ESEF filing responses
 └── README.md                      # This file
 ```
 
@@ -179,6 +191,18 @@ YOURTICKER,YOURCIK
 
 Get CIK from: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany
 
+### EU Ticker Disambiguation (Optional)
+
+Some EU tickers are ambiguous across exchanges/companies. You can force a specific LEI mapping by creating/updating `data/esef_ticker_lei_mapping.csv`:
+
+```csv
+ticker,lei
+ASML,724500Y6DUVHQD6OXN27
+MC,969500M49I5DPEEZQF66
+```
+
+This mapping is checked before live API lookup.
+
 ### Changing Minimum Years Required
 
 Edit `Config.cs`:
@@ -193,6 +217,9 @@ public const int MinYearsRequired = 5;  // Default is 5 years (change as needed)
 
 ### Issue: "No data retrieved" or only 1 year extracted
 **Solution**: This is normal for some companies - SEC EDGAR has sparse historical XBRL data. The tool still exports what's available.
+
+### Issue: EU ticker resolves to wrong company
+**Solution**: Add an explicit mapping in `data/esef_ticker_lei_mapping.csv` (Ticker,LEI). This is recommended for short/ambiguous tickers.
 
 ### Issue: API 403 errors
 **Solution**: Make sure the `User-Agent` header in `SecEdgarFetcher.cs` includes contact info. Check SEC rate limits (typically 10 requests/second allowed).
@@ -253,7 +280,7 @@ This is a personal project. For issues:
 ## Roadmap
 
 - [x] SEC EDGAR (US) - COMPLETE ✅
-- [ ] EU ESEF (Europe)
+- [x] EU ESEF (Europe) - COMPLETE ✅
 - [ ] SEDAR+ (Canada)
 - [ ] ASX (Australia)
 - [ ] EDINET (Japan)
@@ -268,4 +295,4 @@ Open source - use as needed.
 ---
 
 **Last Updated**: March 26, 2026  
-**Status**: Operational - SEC EDGAR working, other regions planned
+**Status**: Operational - SEC EDGAR + EU ESEF working, other regions planned

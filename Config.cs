@@ -29,6 +29,46 @@ public static class Config
         ["Diluted_Shares_Outstanding"] = ["WeightedAverageNumberOfDilutedSharesOutstanding"],
     };
 
+    // IFRS XBRL concept tags used for ESEF (European) filings.
+    // Each label maps to an ordered list of candidate concept names; the first
+    // one present in a filing is used.  The ifrs-full: prefix is the standard
+    // ESEF taxonomy namespace alias.
+    public static readonly Dictionary<string, string[]> XbrlConceptsIfrs = new()
+    {
+        ["Revenue"]  =
+        [
+            "ifrs-full:Revenue",
+            "ifrs-full:RevenueFromContractsWithCustomers",
+            "ifrs-full:RevenueFromRenderingOfServices",
+            "ifrs-full:RevenueFromSaleOfGoods",
+        ],
+        ["Gross_Profit"]         = ["ifrs-full:GrossProfit"],
+        ["Operating_Profit"]     =
+        [
+            "ifrs-full:ProfitLossFromOperatingActivities",
+            "ifrs-full:OperatingProfitLoss",
+        ],
+        // Prefer profit attributable to owners (excludes non-controlling interests)
+        ["Net_Profit"]           =
+        [
+            "ifrs-full:ProfitLossAttributableToOwnersOfParent",
+            "ifrs-full:ProfitLoss",
+        ],
+        ["Cash_From_Operations"] =
+        [
+            "ifrs-full:CashFlowsFromUsedInOperatingActivities",
+            "ifrs-full:NetCashFlowsFromUsedInOperatingActivities",
+        ],
+        ["PPE"]                  = ["ifrs-full:PropertyPlantAndEquipment"],
+        ["Diluted_Shares_Outstanding"] =
+        [
+            "ifrs-full:AdjustedWeightedAverageShares",
+            "ifrs-full:WeightedAverageShares",
+            "ifrs-full:WeightedAverageNumberOfOrdinarySharesOutstanding",
+            "ifrs-full:WeightedAverageNumberOfSharesOutstandingDiluted",
+        ],
+    };
+
     // CSV column order
     public static readonly string[] CsvSchema =
     [

@@ -102,12 +102,24 @@ if (usTickers.Count > 0)
     foreach (var kv in usData) allData[kv.Key] = kv.Value;
 }
 
-// ── TODO: EU / CA / AU / JP ───────────────────────────────────────────────────
+// ── EU – ESEF (filings.xbrl.org) ─────────────────────────────────────────────
+if (euTickers.Count > 0)
+{
+    Logger.Info($"Fetching EU stocks from ESEF (filings.xbrl.org): {string.Join(", ", euTickers)}");
+    var euData = await EsefFetcherHelper.FetchEuStocksAsync(
+        euTickers,
+        useCache:   !noCache,
+        clearCache: clearCache,
+        cacheOnly:  cacheOnly);
+
+    foreach (var kv in euData) allData[kv.Key] = kv.Value;
+}
+
+// ── TODO: CA / AU / JP ────────────────────────────────────────────────────────
 foreach (var (market, list) in new[] {
-    ("EU (ESEF)",  (IList<string>)euTickers),
-    ("Canada",     caTickers),
-    ("Australia",  auTickers),
-    ("Japan",      jpTickers) })
+    ("Canada",    caTickers),
+    ("Australia", auTickers),
+    ("Japan",     jpTickers) })
 {
     if (list.Count > 0)
         Logger.Warning($"{market} market not yet implemented: {string.Join(", ", list)}");
