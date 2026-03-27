@@ -115,11 +115,23 @@ if (euTickers.Count > 0)
     foreach (var kv in euData) allData[kv.Key] = kv.Value;
 }
 
-// ── TODO: CA / AU / JP ────────────────────────────────────────────────────────
+// ── AU – ASX historical announcements ─────────────────────────────────────────
+if (auTickers.Count > 0)
+{
+    Logger.Info($"Fetching AU stocks from ASX announcements: {string.Join(", ", auTickers)}");
+    var auData = await AuFetcherHelper.FetchAuStocksAsync(
+        auTickers,
+        useCache:   !noCache,
+        clearCache: clearCache,
+        cacheOnly:  cacheOnly);
+
+    foreach (var kv in auData) allData[kv.Key] = kv.Value;
+}
+
+// ── TODO: CA / JP ─────────────────────────────────────────────────────────────
 foreach (var (market, list) in new[] {
-    ("Canada",    caTickers),
-    ("Australia", auTickers),
-    ("Japan",     jpTickers) })
+    ("Canada", caTickers),
+    ("Japan",  jpTickers) })
 {
     if (list.Count > 0)
         Logger.Warning($"{market} market not yet implemented: {string.Join(", ", list)}");

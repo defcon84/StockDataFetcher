@@ -2,13 +2,14 @@
 
 A C# / .NET tool for fetching 10+ years of financial data from official regulatory filings worldwide and exporting to CSV format.
 
-**Status**: ✅ **OPERATIONAL** - SEC EDGAR (US) + ESEF (EU) functional
+**Status**: ✅ **OPERATIONAL** - SEC EDGAR (US) + ESEF (EU) + ASX filings index (AU)
 
 ## Features
 
 ### ✅ Currently Working
 - **SEC EDGAR API Integration** - Fetch official 10-K filings for US companies
 - **ESEF API Integration** - Fetch official iXBRL filings for EU companies via filings.xbrl.org
+- **ASX Historical Announcements Integration** - Fetch official AU filing announcements via ASX historical endpoint
 - **Automatic CIK Lookup** - Map stock tickers to SEC identifiers
 - **Automatic LEI Lookup** - Map EU tickers to legal entity identifiers (LEI)
 - **XBRL Financial Metrics** - Extract standardized financial data:
@@ -27,9 +28,9 @@ A C# / .NET tool for fetching 10+ years of financial data from official regulato
 
 ### 🔄 Planned (v2)
 - SEDAR+ for Canadian companies
-- ASX data for Australian companies
 - EDINET for Japanese companies
 - Fallback to quarterly (10-Q) data when annual unavailable
+- Deep AU financial metric extraction from filing documents (PDF parsing / structured source)
 
 ## Installation
 
@@ -63,6 +64,11 @@ dotnet run -- AAPL MSFT NVDA GOOGL
 **Fetch EU stocks (ESEF):**
 ```bash
 dotnet run -- ASML.NL MC.FR
+```
+
+**Fetch AU filings (ASX):**
+```bash
+dotnet run -- KPG.AX BHP.AX
 ```
 
 **Merge multiple stocks into one CSV:**

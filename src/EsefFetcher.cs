@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace StockDataFetcher;
 
 /// <summary>Metadata for one ESEF filing retrieved from filings.xbrl.org.</summary>
-public record FilingInfo(string JsonUrl, string PeriodEnd, string FxoId, string Processed);
+public record FilingInfo(string JsonUrl, string PeriodEnd, string FxoId, string Processed, string DocumentUrl);
 
 /// <summary>
 /// Fetches financial data for EU companies from ESEF Inline XBRL filings
@@ -238,11 +238,38 @@ public sealed class EsefFetcher : IDisposable
             var periodEnd = attrs.TryGetProperty("period_end", out var pe) ? pe.GetString() ?? "" : "";
             var fxoId     = attrs.TryGetProperty("fxo_id",     out var fi) ? fi.GetString() ?? "" : "";
             var processed = attrs.TryGetProperty("processed",  out var pr) ? pr.GetString() ?? "" : "";
+            var reportUrl = attrs.TryGetProperty("report_url", out var ru) ? ru.GetString() ?? "" : "";
+            var htmlUrl   = attrs.TryGetProperty("html_url",   out var hu) ? hu.GetString() ?? "" : "";
+            var xhtmlUrl  = attrs.TryGetProperty("xhtml_url",  out var xu) ? xu.GetString() ?? "" : "";
+
+            var documentUrl = reportUrl;
+            if (string.IsNullOrWhiteSpace(documentUrl)) documentUrl = htmlUrl;
+            if (string.IsNullOrWhiteSpace(documentUrl)) documentUrl = xhtmlUrl;
+            if (string.IsNullOrWhiteSpace(documentUrl) && jsonUrl.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                documentUrl = jsonUrl[..^5] + ".xhtml";
+
+            if (!string.IsNullOrWhiteSpace(documentUrl) &&
+                !documentUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                documentUrl = documentUrl.StartsWith("/", StringComparison.Ordinal)
+                    ? BaseUrl + documentUrl
+                    : $"{BaseUrl}/{documentUrl}";
+            }
+
             if (!string.IsNullOrEmpty(jsonUrl))
-                result.Add(new FilingInfo(jsonUrl, periodEnd, fxoId, processed));
+                result.Add(new FilingInfo(jsonUrl, periodEnd, fxoId, processed, documentUrl));
         }
         return result;
     }
+
+    private static bool NeedsDocumentFallback(FinancialRecord rec) =>
+        !rec.Revenue.HasValue ||
+        !rec.Gross_Profit.HasValue ||
+        !rec.Operating_Profit.HasValue ||
+        !rec.Net_Profit.HasValue ||
+        !rec.Cash_From_Operations.HasValue ||
+        !rec.PPE.HasValue ||
+        !rec.Diluted_Shares_Outstanding.HasValue;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Filing facts document
@@ -461,9 +488,17 @@ public sealed class EsefFetcher : IDisposable
         // Filings are sorted newest-first.  Process in order so that the first
         // value encountered for each (year, label) pair is the most recent one.
         var allByYear = new Dictionary<int, FinancialRecord>();
+        var docUrlByYear = new Dictionary<int, string>();
 
         foreach (var filing in filings)
         {
+            if (DateTime.TryParse(filing.PeriodEnd, out var periodDate) &&
+                !string.IsNullOrWhiteSpace(filing.DocumentUrl) &&
+                !docUrlByYear.ContainsKey(periodDate.Year))
+            {
+                docUrlByYear[periodDate.Year] = filing.DocumentUrl;
+            }
+
             var facts = await GetFilingFactsAsync(lei, filing, ct);
             if (facts is null) continue;
 
@@ -485,6 +520,26 @@ public sealed class EsefFetcher : IDisposable
                     existing.Diluted_Shares_Outstanding ??= rec.Diluted_Shares_Outstanding;
                 }
             }
+        }
+
+        var extractor = new PdfStatementExtractor(_http, _cache, _useCache);
+        foreach (var rec in allByYear.Values)
+        {
+            if (!NeedsDocumentFallback(rec))
+                continue;
+
+            if (!docUrlByYear.TryGetValue(rec.Year, out var docUrl) || string.IsNullOrWhiteSpace(docUrl))
+                continue;
+
+            var cacheKey = $"{rec.Year}_{Math.Abs(docUrl.GetHashCode()):x}";
+            var extracted = await extractor.ExtractFromDocumentAsync(
+                "eu",
+                lei,
+                cacheKey,
+                docUrl,
+                ct);
+
+            PdfStatementExtractor.FillMissingMetrics(rec, extracted);
         }
 
         var result = allByYear

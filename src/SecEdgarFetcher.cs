@@ -164,6 +164,92 @@ public class SecEdgarFetcher : IDisposable
         }
     }
 
+    public async Task<JsonElement?> GetCompanySubmissionsAsync(string cik, CancellationToken ct = default)
+    {
+        if (_useCache)
+        {
+            var hit = _cache.Get("us", cik, "submissions");
+            if (hit is not null)
+                return hit;
+        }
+
+        try
+        {
+            var url = $"{Config.SecEdgarBaseUrl}/CIK{cik}.json";
+            using var doc = await GetJsonAsync(url, ct);
+            var element = doc.RootElement.Clone();
+            if (_useCache)
+                _cache.Set("us", cik, "submissions", element);
+            return element;
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug($"Failed to fetch SEC submissions for CIK {cik}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static bool NeedsDocumentFallback(FinancialRecord rec) =>
+        !rec.Revenue.HasValue ||
+        !rec.Gross_Profit.HasValue ||
+        !rec.Operating_Profit.HasValue ||
+        !rec.Net_Profit.HasValue ||
+        !rec.Cash_From_Operations.HasValue ||
+        !rec.PPE.HasValue ||
+        !rec.Diluted_Shares_Outstanding.HasValue;
+
+    private async Task<Dictionary<int, (string Url, string Filed)>> GetAnnualDocumentUrlsAsync(
+        string cik,
+        CancellationToken ct = default)
+    {
+        var result = new Dictionary<int, (string Url, string Filed)>();
+        var submissions = await GetCompanySubmissionsAsync(cik, ct);
+        if (submissions is not JsonElement root) return result;
+
+        if (!root.TryGetProperty("filings", out var filings) ||
+            !filings.TryGetProperty("recent", out var recent))
+            return result;
+
+        if (!recent.TryGetProperty("form", out var forms) || forms.ValueKind != JsonValueKind.Array) return result;
+        if (!recent.TryGetProperty("accessionNumber", out var accessions) || accessions.ValueKind != JsonValueKind.Array) return result;
+        if (!recent.TryGetProperty("primaryDocument", out var primaryDocs) || primaryDocs.ValueKind != JsonValueKind.Array) return result;
+
+        JsonElement reportDates = default;
+        JsonElement filingDates = default;
+        var hasReportDates = recent.TryGetProperty("reportDate", out reportDates) && reportDates.ValueKind == JsonValueKind.Array;
+        var hasFilingDates = recent.TryGetProperty("filingDate", out filingDates) && filingDates.ValueKind == JsonValueKind.Array;
+
+        var cikNoLeadingZeros = long.TryParse(cik, out var cikLong) ? cikLong.ToString() : cik.TrimStart('0');
+
+        int count = forms.GetArrayLength();
+        for (int i = 0; i < count; i++)
+        {
+            var form = forms[i].GetString() ?? "";
+            if (!string.Equals(form, "10-K", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var accession = accessions[i].GetString() ?? "";
+            var primaryDocument = primaryDocs[i].GetString() ?? "";
+            if (string.IsNullOrWhiteSpace(accession) || string.IsNullOrWhiteSpace(primaryDocument)) continue;
+
+            var filed = hasFilingDates ? (filingDates[i].GetString() ?? "") : "";
+            var reportDate = hasReportDates ? (reportDates[i].GetString() ?? "") : "";
+            var yearDate = !string.IsNullOrWhiteSpace(reportDate) ? reportDate : filed;
+            if (!DateTime.TryParse(yearDate, out var parsed)) continue;
+
+            int year = parsed.Year;
+            var accessionNoDashes = accession.Replace("-", "", StringComparison.Ordinal);
+            var url = $"https://www.sec.gov/Archives/edgar/data/{cikNoLeadingZeros}/{accessionNoDashes}/{primaryDocument}";
+
+            if (!result.TryGetValue(year, out var existing) ||
+                string.Compare(filed, existing.Filed, StringComparison.Ordinal) > 0)
+            {
+                result[year] = (url, filed);
+            }
+        }
+
+        return result;
+    }
+
     public List<FinancialRecord> ExtractFinancialMetrics(JsonElement facts, string ticker, string cik)
     {
         var fiscalData = new Dictionary<int, FinancialRecord>();
@@ -324,7 +410,33 @@ public class SecEdgarFetcher : IDisposable
             return [];
         }
 
-        return ExtractFinancialMetrics(facts.Value, ticker, cik);
+        var records = ExtractFinancialMetrics(facts.Value, ticker, cik);
+        if (records.Count == 0) return records;
+
+        var docUrlsByYear = await GetAnnualDocumentUrlsAsync(cik, ct);
+        if (docUrlsByYear.Count == 0) return records;
+
+        var extractor = new PdfStatementExtractor(_http, _cache, _useCache);
+        foreach (var rec in records)
+        {
+            if (!NeedsDocumentFallback(rec))
+                continue;
+
+            if (!docUrlsByYear.TryGetValue(rec.Year, out var docInfo))
+                continue;
+
+            var cacheKey = $"{rec.Year}_{Math.Abs(docInfo.Url.GetHashCode()):x}";
+            var extracted = await extractor.ExtractFromDocumentAsync(
+                "us",
+                cik,
+                cacheKey,
+                docInfo.Url,
+                ct);
+
+            PdfStatementExtractor.FillMissingMetrics(rec, extracted);
+        }
+
+        return records;
     }
 
     public void Dispose() => _http.Dispose();

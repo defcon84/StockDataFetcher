@@ -21,6 +21,13 @@ public class SimpleCache
         return Path.Combine(dir, $"{name}.json");
     }
 
+    private string GetBinaryPath(string market, string identifier, string name)
+    {
+        var dir = Path.Combine(_root, market, identifier);
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, $"{name}.bin");
+    }
+
     // Sidecar metadata file stores only the download timestamp so that the
     // primary .json file is the exact raw response received from the source.
     private static string MetaPath(string dataPath) => dataPath + ".meta";
@@ -75,6 +82,52 @@ public class SimpleCache
         catch (Exception ex)
         {
             Logger.Debug($"Cache write error: {ex.Message}");
+        }
+    }
+
+    public byte[]? GetBytes(string market, string identifier, string name)
+    {
+        var path = GetBinaryPath(market, identifier, name);
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            var metaPath = MetaPath(path);
+            if (File.Exists(metaPath))
+            {
+                using var metaStream = File.OpenRead(metaPath);
+                var meta = JsonDocument.Parse(metaStream);
+                if (meta.RootElement.TryGetProperty("cached_at", out var cachedAtEl) &&
+                    DateTime.TryParse(cachedAtEl.GetString(), out var cachedAt) &&
+                    DateTime.Now - cachedAt > Expiry)
+                {
+                    return null;
+                }
+            }
+
+            Logger.Debug($"Cache hit (binary): {path}");
+            return File.ReadAllBytes(path);
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug($"Cache binary read error: {ex.Message}");
+            return null;
+        }
+    }
+
+    public void SetBytes(string market, string identifier, string name, byte[] data)
+    {
+        var path = GetBinaryPath(market, identifier, name);
+        try
+        {
+            File.WriteAllBytes(path, data);
+            var meta = JsonSerializer.Serialize(new { cached_at = DateTime.Now.ToString("O") });
+            File.WriteAllText(MetaPath(path), meta);
+            Logger.Debug($"Cached binary to: {path}");
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug($"Cache binary write error: {ex.Message}");
         }
     }
 

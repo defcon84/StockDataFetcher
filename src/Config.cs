@@ -12,6 +12,10 @@ public static class Config
     public const string SecEdgarBaseUrl = "https://data.sec.gov/submissions";
     public const double SecApiDelay = 0.1; // seconds between requests
 
+    // ASX historical announcements (official ASX endpoint)
+    public const string AsxHistoricalAnnouncementsBaseUrl = "https://www.asx.com.au/asx/v2/statistics/announcements.do";
+    public const double AsxApiDelay = 0.1; // seconds between requests
+
     // Minimum years of data required
     public const int MinYearsRequired = 5;
 
